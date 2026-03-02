@@ -1,13 +1,10 @@
--- Tail UI path-based loader for executors.
--- This file loads modules from your GitHub raw paths (src/*) instead of using one giant monolithic bundle.
---
--- Configure before use:
--- getgenv().TAILUI_REMOTE = {
---     user = "SEU_USUARIO",
---     repo = "SEU_REPO",
---     branch = "main",
---     basePath = "src"
--- }
+
+getgenv().TAILUI_REMOTE = {
+	user = "SEU_USUARIO",
+	repo = "SEU_REPO",
+	branch = "main",
+	BasePath = "src"
+}
 
 local function readGlobal(name)
 	local env = getfenv and getfenv() or _G
