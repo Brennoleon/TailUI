@@ -1,30 +1,83 @@
 local DEFAULT_LUCIDE = {
-	search = "🔎",
-	settings = "⚙",
-	close = "●",
-	minimize = "◌",
-	maximize = "◍",
-	tag = "🏷",
-	folder = "📁",
-	save = "💾",
-	theme = "🎨",
-	loading = "⌛",
-	warning = "⚠",
-	success = "✓",
-	error = "✕",
+	search = "S",
+	settings = "G",
+	close = "X",
+	minimize = "-",
+	maximize = "+",
+	tag = "#",
+	folder = "F",
+	save = "SV",
+	theme = "T",
+	loading = "~",
+	warning = "!",
+	success = "OK",
+	error = "X",
+	home = "H",
+	combat = "C",
+	debug = "D",
+}
+
+local DEFAULT_MACOS = {
+	search = "S",
+	settings = "SG",
+	close = "X",
+	minimize = "-",
+	maximize = "+",
+	tag = "TG",
+	folder = "FD",
+	save = "SD",
+	theme = "TH",
+	loading = "..",
+	warning = "!",
+	success = "OK",
+	error = "X",
+	home = "HM",
+	combat = "CB",
+	debug = "DB",
+}
+
+local ICON_COLOR_PATH = {
+	search = "colors.textMuted",
+	settings = "colors.accent",
+	close = "colors.danger",
+	minimize = "colors.warning",
+	maximize = "colors.success",
+	tag = "colors.textMuted",
+	folder = "colors.accent",
+	save = "colors.success",
+	theme = "colors.warning",
+	loading = "colors.accent",
+	warning = "colors.warning",
+	success = "colors.success",
+	error = "colors.danger",
+	home = "colors.accent",
+	combat = "colors.danger",
+	debug = "colors.warning",
 }
 
 local IconRegistry = {}
 IconRegistry.__index = IconRegistry
+
+local function token(theme, path)
+	local current = theme
+	for part in tostring(path):gmatch("[^%.]+") do
+		if type(current) ~= "table" then
+			return nil
+		end
+		current = current[part]
+	end
+	return current
+end
 
 function IconRegistry.new(logger)
 	local self = setmetatable({}, IconRegistry)
 	self.logger = logger
 	self.maxExternalLibraries = 5
 	self.externalCount = 0
-	self.preferredLibraries = { "lucide" }
+	self.preferredLibraries = { "macos", "lucide" }
 	self.libraries = {
 		lucide = DEFAULT_LUCIDE,
+		macos = DEFAULT_MACOS,
 	}
 	return self
 end
@@ -38,11 +91,11 @@ end
 
 function IconRegistry:registerLibrary(name, provider)
 	name = tostring(name or "")
-	if name == "" or name == "lucide" then
+	if name == "" or name == "lucide" or name == "macos" then
 		return false, "library name is invalid or reserved"
 	end
 	if self.libraries[name] == nil and self.externalCount >= self.maxExternalLibraries then
-		return false, "max icon libraries reached (5 external + lucide)"
+		return false, "max icon libraries reached (5 external + builtins)"
 	end
 	if type(provider) ~= "table" and type(provider) ~= "function" then
 		return false, "icon provider must be table or function"
@@ -77,13 +130,21 @@ function IconRegistry:resolve(iconName, options)
 		end
 	end
 
-	local fallbackProvider = self.libraries.lucide
+	local fallbackProvider = self.libraries.macos or self.libraries.lucide
 	local fallback = resolveFromProvider(fallbackProvider, iconName)
 	if fallback ~= nil then
 		return fallback
 	end
 
-	return options.fallback or "•"
+	return options.fallback or "*"
+end
+
+function IconRegistry:resolveColor(iconName, theme, fallback)
+	local path = ICON_COLOR_PATH[tostring(iconName or "")]
+	if not path then
+		return fallback
+	end
+	return token(theme, path) or fallback
 end
 
 function IconRegistry:listLibraries()

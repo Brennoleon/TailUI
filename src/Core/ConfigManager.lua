@@ -1,15 +1,15 @@
 local DEFAULT_CONFIG = {
 	internal = {
-		version = "2.0.0",
+		version = "2.1.0",
 		searchEnabled = true,
 		showLoading = true,
-		mobileBreakpoint = 860,
+		mobileBreakpoint = 920,
 	},
 	window = {
 		title = "Tail UI",
 		subtitle = "Executor UI Framework",
-		size = { width = 700, height = 440 },
-		minimumSize = { width = 460, height = 320 },
+		size = { width = 660, height = 420 },
+		minimumSize = { width = 420, height = 300 },
 		resizable = true,
 		draggable = true,
 		forceDarkOnFullscreen = true,

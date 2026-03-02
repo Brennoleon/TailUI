@@ -48,7 +48,7 @@ end)
 
 local TailUI = {}
 TailUI.__index = TailUI
-TailUI.VERSION = "2.0.0"
+TailUI.VERSION = "2.1.0"
 
 local singleton = nil
 
@@ -206,7 +206,19 @@ function TailUI:applyTheme(name, overrides)
 	return ok, err
 end
 
-function TailUI:listThemes()
+function TailUI:listThemes(detailed)
+	local list = self.themeManager:list()
+	if detailed == true then
+		return list
+	end
+	local names = {}
+	for _, item in ipairs(list) do
+		table.insert(names, item.name)
+	end
+	return names
+end
+
+function TailUI:listThemesDetailed()
 	return self.themeManager:list()
 end
 
@@ -390,6 +402,8 @@ end
 TailUI.CreateWindow = TailUI.createWindow
 TailUI.RegisterTheme = TailUI.registerTheme
 TailUI.ApplyTheme = TailUI.applyTheme
+TailUI.ListThemes = TailUI.listThemes
+TailUI.ListThemesDetailed = TailUI.listThemesDetailed
 TailUI.RegisterIconLibrary = TailUI.registerIconLibrary
 TailUI.RegisterFont = TailUI.registerFont
 TailUI.GetConfig = TailUI.getConfig

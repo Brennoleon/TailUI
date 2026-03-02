@@ -1,7 +1,7 @@
 -- TailUI v2 full executor test script.
 -- Edit TAILUI_REMOTE fields for your repository before running.
 
-getgenv().TAILUI_REMOTE = {
+_G.TAILUI_REMOTE = {
 	user = "Brennoleon",
 	repo = "TailUI",
 	branch = "main",
@@ -35,12 +35,15 @@ local window = ui:tailwindow({
 	transparency = 0.08,
 	loading = {
 		enabled = true,
+		hold = true,
 		title = "Tail UI v2",
 		subtitle = "Loading complete API test...",
 		icon = "*",
 		detail = "Booting modules",
 	},
 })
+
+window:updateLoading(0.2, "Building overview tab")
 
 window:setSearchPlaceholder("Search controls, tabs and settings...")
 window:setSidebarWidth(190, 150)
@@ -156,6 +159,8 @@ local combatTab = window:addTab({
 	icon = "settings",
 })
 
+window:updateLoading(0.45, "Building combat tab")
+
 local combat = combatTab:addSection({
 	title = "Combat Systems",
 	description = "Keybind sets + action controls.",
@@ -225,6 +230,8 @@ local themesTab = window:addTab({
 	icon = "theme",
 })
 
+window:updateLoading(0.65, "Building themes tab")
+
 local builtins = themesTab:addSection({
 	title = "Dark Themes",
 	description = "Built-in and dynamic themes.",
@@ -281,6 +288,8 @@ local storageTab = window:addTab({
 	icon = "save",
 })
 
+window:updateLoading(0.82, "Building storage tab")
+
 local storage = storageTab:addSection({
 	title = "FileSystem API",
 	description = "readfile/writefile/makefolder wrappers.",
@@ -322,6 +331,9 @@ local debugTab = window:addTab({
 	title = "Debug",
 	icon = "warning",
 })
+
+window:updateLoading(0.97, "Finalizing")
+window:endLoading()
 
 local debugSection = debugTab:addSection({
 	title = "Runtime / API",

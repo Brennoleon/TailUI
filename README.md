@@ -1,66 +1,62 @@
-# Tail UI Library (Release 2)
+# Tail UI Library (Release 2.1)
 
-Framework de UI para executores Roblox modernos, com foco em visual dark minimal, performance e API avançada.
+UI library para executores Roblox, focada em design dark minimal, arquitetura modular e API completa para hubs.
 
-## Status
+## Destaques
 
-- Arquitetura modular via `src/`
-- Loader por path remoto (`dist/TailUI.pathloader.lua`)
-- Design dark executor-first
-- API rica (tabs, sections, widgets, tags, keybind sets, storage, temas dinâmicos)
+- Loader modular por path remoto (`dist/TailUI.pathloader.lua`)
+- Sem dependencia de `getgenv` (usa `_G.TAILUI_REMOTE` opcional)
+- Bootstrap loading no loader (carrega junto enquanto os modulos baixam)
+- UI mobile-first com layout adaptativo inteligente
+- Busca fuzzy na sidebar com overlay acima da UI
+- Keybind sets, temas dinamicos, storage API e isolamento de erro
+- Estrutura pronta para producao (sem bundle monolitico)
 
-## Arquivo Principal (Executor)
-
-Use **somente**:
+## Arquivo principal para executor
 
 - `dist/TailUI.pathloader.lua`
 
-O projeto **não depende** mais de bundle monolítico.
-
-## Instalação / Uso com Loadstring
+## Loadstring rapido
 
 ```lua
-getgenv().TAILUI_REMOTE = {
+local TailUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Brennoleon/TailUI/main/dist/TailUI.pathloader.lua"))()
+```
+
+## Config remota (opcional)
+
+```lua
+_G.TAILUI_REMOTE = {
     user = "Brennoleon",
     repo = "TailUI",
     branch = "main",
     basePath = "src",
     forceReload = false,
-    debug = false
-}
-
-local TailUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Brennoleon/TailUI/main/dist/TailUI.pathloader.lua"))()
-```
-
-Para repositório privado, adicione `authToken` na config (o loader usa fallback via `request/http_request/syn.request`):
-
-```lua
-getgenv().TAILUI_REMOTE = {
-    user = "Brennoleon",
-    repo = "TailUI",
-    branch = "main",
-    basePath = "src",
-    authToken = "ghp_xxxxx",
+    debug = false,
+    showBootLoader = true,
+    -- authToken = "ghp_xxx", -- para repo privado
 }
 ```
 
 ## Quickstart
 
 ```lua
+local TailUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Brennoleon/TailUI/main/dist/TailUI.pathloader.lua"))()
+
 local ui = TailUI.getSingleton({
     hubName = "MeuHub",
 })
 
 local window = ui:tailwindow({
     title = "Tail UI",
-    subtitle = "Release 2",
+    subtitle = "Release 2.1",
     searchEnabled = true,
     forceDarkOnFullscreen = true,
     transparency = 0.08,
     loading = {
         enabled = true,
-        title = "Tail UI v2",
-        subtitle = "Executor runtime",
+        hold = false,
+        title = "Tail UI",
+        subtitle = "Initializing...",
         icon = "*",
     }
 })
@@ -81,22 +77,41 @@ sec:addSlider({
 })
 ```
 
-Script completo de validação da biblioteca no executor:
+## Script completo de teste
 
 - `examples/full_test_executor.lua`
 
-## Design / UX (Release 2)
+Esse script cobre:
+- tabs, sections e controles
+- keybind sets
+- temas built-in + tema runtime
+- storage API
+- runtime info
+- loading hold (abre no inicio e fecha no final da montagem)
 
-- Visual dark minimal inspirado em hubs modernos
-- Busca na sidebar
-- Resultado de busca em overlay acima da UI
-- Cantos arredondados e layout compacto
-- `TopMenuOpenButton` arrastável
-- Fullscreen com lock de tema escuro
+## APIs principais
 
-## Keybind Sets (Novo)
+### Core
 
-### API global
+```lua
+local ui = TailUI.getSingleton({ hubName = "MeuHub" })
+local window = ui:tailwindow({ title = "Tail UI" })
+```
+
+### Janela
+
+```lua
+window:setTransparency(0.12)
+window:setSidebarWidth(190, 140)
+window:setSearchPlaceholder("Search controls...")
+window:setFullscreenDarkTheme("midnight-pro")
+window:setSearchEnabled(true)
+window:beginLoading("Loading...", "Mounting")
+window:updateLoading(0.5, "Half way")
+window:endLoading()
+```
+
+### Keybind sets
 
 ```lua
 ui:createKeybindSet("combat")
@@ -104,7 +119,6 @@ ui:activateKeybindSet("combat")
 
 ui:bindKeybind("combat", {
     id = "dash",
-    title = "Dash",
     key = Enum.KeyCode.Q,
     callback = function()
         print("Dash")
@@ -112,107 +126,38 @@ ui:bindKeybind("combat", {
 })
 ```
 
-### API de seção
-
-```lua
-sec:addKeybind({
-    title = "Panic Key",
-    set = "global",
-    key = Enum.KeyCode.End,
-    callback = function()
-        print("Panic action")
-    end
-})
-```
-
-## API Nova de Janela
-
-```lua
-window:setTransparency(0.12)          -- ou setOpacity
-window:setSidebarWidth(200, 150)      -- desktop, mobile
-window:setSearchPlaceholder("Search controls...")
-window:setFullscreenDarkTheme("midnight-pro")
-window:runLoadingSequence({ "A", "B", "C" })
-```
-
-## Temas (Dark Pack)
+### Themes
 
 Temas built-in:
-
-- `midnight-pro` (padrão)
+- `midnight-pro`
 - `carbon-night`
 - `neon-obsidian`
-
-Aplicação:
 
 ```lua
 ui:applyTheme("carbon-night")
 ```
 
-Custom:
-
-```lua
-ui:registerTheme("my-theme", {
-    meta = { name = "My Theme", dark = true },
-    colors = {
-        background = Color3.fromRGB(10, 13, 18),
-        surface = Color3.fromRGB(16, 19, 25),
-        topbar = Color3.fromRGB(8, 10, 14),
-        sidebar = Color3.fromRGB(9, 12, 16),
-        text = Color3.fromRGB(232, 241, 252),
-        textMuted = Color3.fromRGB(132, 147, 171),
-        border = Color3.fromRGB(36, 48, 66),
-        accent = Color3.fromRGB(42, 161, 255),
-        success = Color3.fromRGB(54, 170, 122),
-        warning = Color3.fromRGB(242, 179, 64),
-        danger = Color3.fromRGB(220, 90, 92),
-        searchHighlight = Color3.fromRGB(80, 145, 255),
-        overlay = Color3.fromRGB(6, 8, 12),
-    },
-    rounding = { window = 18, card = 14, pill = 999 },
-}, { persist = true })
-```
-
-## Storage API
-
-```lua
-local root = ui:getHubRoot()
-ui:makeFolder(root .. "/profiles")
-ui:writeJSON(root .. "/profiles/default.json", { theme = ui:getConfig("theme.active") })
-local profile = ui:readJSON(root .. "/profiles/default.json", {})
-```
-
-## Runtime / Executor Info
-
-```lua
-local runtime = ui:getRuntimeInfo()
-print(runtime.executor)
-print(runtime.capabilities.getgc, runtime.capabilities.gethui)
-```
-
-## Estrutura
+## Estrutura do projeto
 
 ```text
 dist/
   TailUI.pathloader.lua
 src/
   TailUI.lua
-  Executor/
-    Runtime.lua
-  Input/
-    KeybindManager.lua
   Core/
   Theme/
   Assets/
   UI/
+  Input/
+  Executor/
 examples/
-  full_test_executor.lua
   quickstart.lua
   static_api.lua
+  full_test_executor.lua
 ```
 
-## Observações de Produção
+## Producao
 
-- Recomendado para executores modernos com suporte robusto a UI/IO.
-- `pathloader` possui fallback HTTP via `request/http_request/syn.request`.
-- Para atualização de release, mantenha `dist/TailUI.pathloader.lua` + `src/` sincronizados no repo.
+- Para release, mantenha `dist/TailUI.pathloader.lua` e `src/` sincronizados.
+- Para repo privado, use `authToken` em `_G.TAILUI_REMOTE`.
+- O loader usa fallback HTTP via `request/http_request/syn.request`.
