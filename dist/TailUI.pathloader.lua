@@ -1,9 +1,8 @@
-
 getgenv().TAILUI_REMOTE = {
-	user = "SEU_USUARIO",
-	repo = "SEU_REPO",
+	user = "Brennoleon",
+	repo = "TailUI",
 	branch = "main",
-	BasePath = "src"
+	basePath = "src"
 }
 
 local function readGlobal(name)
