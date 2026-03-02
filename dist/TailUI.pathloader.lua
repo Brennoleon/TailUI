@@ -1,26 +1,4 @@
-<<<<<<< HEAD
-getgenv().TAILUI_REMOTE = {
-	user = "Brennoleon",
-	repo = "TailUI",
-	branch = "main",
-	basePath = "src"
-}
-=======
--- Tail UI Path Loader (Release 2)
--- Focused on modern Roblox executors.
---
--- Usage:
--- getgenv().TAILUI_REMOTE = {
---     user = "Brennoleon",
---     repo = "TailUI",
---     branch = "main",
---     basePath = "src",
---     forceReload = false,
---     debug = false
--- }
--- local TailUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Brennoleon/TailUI/main/dist/TailUI.pathloader.lua"))()
->>>>>>> e8e5cd2 (feat: release 2 executor-first pathloader, ui redesign, keybind/runtime api, docs)
-
+-- here is main file <3
 local function readGlobal(name)
 	local env = getfenv and getfenv() or _G
 	if env and env[name] ~= nil then
