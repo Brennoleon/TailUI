@@ -9,12 +9,10 @@ local function __require(name)
 	if cached ~= nil then
 		return cached
 	end
-
 	local loader = __modules[name]
 	if not loader then
 		error("[TailUI Bundle] module not found: " .. tostring(name), 2)
 	end
-
 	local value = loader()
 	__cache[name] = value
 	return value
