@@ -34,12 +34,21 @@ local FontRegistry = loadModule("Assets.FontRegistry", function()
 	return require(script.Assets.FontRegistry)
 end)
 
+local KeybindManager = loadModule("Input.KeybindManager", function()
+	return require(script.Input.KeybindManager)
+end)
+
+local Runtime = loadModule("Executor.Runtime", function()
+	return require(script.Executor.Runtime)
+end)
+
 local Window = loadModule("UI.Window", function()
 	return require(script.UI.Window)
 end)
 
 local TailUI = {}
 TailUI.__index = TailUI
+TailUI.VERSION = "2.0.0"
 
 local singleton = nil
 
@@ -112,6 +121,8 @@ function TailUI.new(options)
 
 	self.iconRegistry = IconRegistry.new(self.logger)
 	self.fontRegistry = FontRegistry.new(self.logger)
+	self.keybindManager = KeybindManager.new(self.logger)
+	self.runtime = Runtime.new(self.logger)
 	self.themeManager = ThemeManager.new(self.fileSystem, self.logger, self.configManager)
 
 	self.themeManager:registerBuiltins(BuiltinThemes)
@@ -119,14 +130,14 @@ function TailUI.new(options)
 		self.themeManager:loadDiskThemes()
 	end
 
-	local appliedTheme = self.config.theme.active or "safari-ocean"
+	local appliedTheme = self.config.theme.active or "midnight-pro"
 	local okTheme, themeErr = self.themeManager:apply(appliedTheme)
 	if not okTheme then
 		self.logger:warn("failed to apply configured theme, using fallback", {
 			theme = appliedTheme,
 			error = themeErr,
 		})
-		self.themeManager:apply("safari-ocean")
+		self.themeManager:apply("midnight-pro")
 	end
 
 	self.iconRegistry:setPreferredLibraries(self.config.icons.preferred or { "lucide" })
@@ -149,6 +160,8 @@ function TailUI:_buildWindowContext()
 		themeManager = self.themeManager,
 		iconRegistry = self.iconRegistry,
 		fontRegistry = self.fontRegistry,
+		keybindManager = self.keybindManager,
+		runtime = self.runtime,
 		config = self.config,
 	}
 end
@@ -221,6 +234,34 @@ end
 
 function TailUI:listFonts()
 	return self.fontRegistry:list()
+end
+
+function TailUI:createKeybindSet(name)
+	return self.keybindManager:registerSet(name)
+end
+
+function TailUI:activateKeybindSet(name)
+	return self.keybindManager:setActiveSet(name)
+end
+
+function TailUI:getActiveKeybindSet()
+	return self.keybindManager:getActiveSet()
+end
+
+function TailUI:listKeybindSets()
+	return self.keybindManager:listSets()
+end
+
+function TailUI:bindKeybind(setName, options)
+	return self.keybindManager:bind(setName, options)
+end
+
+function TailUI:getRuntimeInfo()
+	return self.runtime:report()
+end
+
+function TailUI:getVersion()
+	return TailUI.VERSION
 end
 
 function TailUI:getConfig(path)
@@ -309,6 +350,9 @@ function TailUI:shutdown()
 		end)
 	end
 	self.windows = {}
+	if self.keybindManager then
+		self.keybindManager:destroy()
+	end
 end
 
 function TailUI.tailwindow(selfOrOptions, maybeOptions)
@@ -356,5 +400,12 @@ TailUI.WriteFile = TailUI.writeFile
 TailUI.ReadFile = TailUI.readFile
 TailUI.ReadJSON = TailUI.readJSON
 TailUI.WriteJSON = TailUI.writeJSON
+TailUI.CreateKeybindSet = TailUI.createKeybindSet
+TailUI.ActivateKeybindSet = TailUI.activateKeybindSet
+TailUI.GetActiveKeybindSet = TailUI.getActiveKeybindSet
+TailUI.ListKeybindSets = TailUI.listKeybindSets
+TailUI.BindKeybind = TailUI.bindKeybind
+TailUI.GetRuntimeInfo = TailUI.getRuntimeInfo
+TailUI.GetVersion = TailUI.getVersion
 
 return TailUI

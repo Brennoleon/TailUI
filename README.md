@@ -1,324 +1,218 @@
-# Tail UI Library
+# Tail UI Library (Release 2)
 
-UI Library para scripts Roblox, com arquitetura inspirada no Safari, API modular e sistema completo de tema, storage e isolamento de erros.
+Framework de UI para executores Roblox modernos, com foco em visual dark minimal, performance e API avançada.
 
-## Arquivo Principal Para Executor
+## Status
 
-Arquivo principal para `loadstring`:
+- Arquitetura modular via `src/`
+- Loader por path remoto (`dist/TailUI.pathloader.lua`)
+- Design dark executor-first
+- API rica (tabs, sections, widgets, tags, keybind sets, storage, temas dinâmicos)
 
-- `dist/TailUI.pathloader.lua` (recomendado, modular)
-- `dist/TailUI.executor.lua` (opcional, bundle monolitico)
+## Arquivo Principal (Executor)
 
-Para aproveitar a estrutura modular de `src/`, use o `pathloader`.
+Use **somente**:
 
-Exemplo de URL raw:
+- `dist/TailUI.pathloader.lua`
 
-```text
-https://raw.githubusercontent.com/SEU_USUARIO/SEU_REPO/main/dist/TailUI.pathloader.lua
-```
+O projeto **não depende** mais de bundle monolítico.
 
-Uso no executor:
+## Instalação / Uso com Loadstring
 
 ```lua
 getgenv().TAILUI_REMOTE = {
-    user = "SEU_USUARIO",
-    repo = "SEU_REPO",
+    user = "Brennoleon",
+    repo = "TailUI",
     branch = "main",
-    basePath = "src"
+    basePath = "src",
+    forceReload = false,
+    debug = false
 }
 
-local TailUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/SEU_USUARIO/SEU_REPO/main/dist/TailUI.pathloader.lua"))()
+local TailUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Brennoleon/TailUI/main/dist/TailUI.pathloader.lua"))()
+```
 
+Para repositório privado, adicione `authToken` na config (o loader usa fallback via `request/http_request/syn.request`):
+
+```lua
+getgenv().TAILUI_REMOTE = {
+    user = "Brennoleon",
+    repo = "TailUI",
+    branch = "main",
+    basePath = "src",
+    authToken = "ghp_xxxxx",
+}
+```
+
+## Quickstart
+
+```lua
 local ui = TailUI.getSingleton({
-    hubName = "MeuHubExecutor"
+    hubName = "MeuHub",
 })
 
 local window = ui:tailwindow({
-    title = "Tail UI Executor",
-    subtitle = "Safari Architecture",
+    title = "Tail UI",
+    subtitle = "Release 2",
     searchEnabled = true,
-    loading = { enabled = true }
+    forceDarkOnFullscreen = true,
+    transparency = 0.08,
+    loading = {
+        enabled = true,
+        title = "Tail UI v2",
+        subtitle = "Executor runtime",
+        icon = "*",
+    }
+})
+
+local tab = window:addTab({ title = "Main", icon = "settings" })
+local sec = tab:addSection({ title = "General", description = "Core controls" })
+
+sec:addToggle({
+    title = "Auto Farm",
+    default = false,
+    callback = function(v) print("Auto Farm:", v) end
+})
+
+sec:addSlider({
+    title = "Walk Speed",
+    min = 16, max = 120, step = 1, default = 25,
+    callback = function(v) print("Speed:", v) end
 })
 ```
 
-## Publicar No GitHub (para usar Raw)
+Script completo de validação da biblioteca no executor:
 
-Sim, para usar `game:HttpGet(...)` no executor voce precisa hospedar o arquivo em algum lugar acessivel por URL (GitHub Raw e o mais comum).
+- `examples/full_test_executor.lua`
 
-Fluxo recomendado:
+## Design / UX (Release 2)
 
-1. Suba o projeto no GitHub com a pasta `src/` e `dist/TailUI.pathloader.lua`.
-2. Use o `pathloader` no executor com `getgenv().TAILUI_REMOTE`.
-3. (Opcional) gere bundle monolitico se quiser fallback:
-   - `powershell -ExecutionPolicy Bypass -File tools/build_executor_bundle.ps1`
-4. Suba tambem `dist/TailUI.executor.lua` se for usar esse modo.
+- Visual dark minimal inspirado em hubs modernos
+- Busca na sidebar
+- Resultado de busca em overlay acima da UI
+- Cantos arredondados e layout compacto
+- `TopMenuOpenButton` arrastável
+- Fullscreen com lock de tema escuro
 
-Se usar monolitico, sempre que alterar arquivos em `src/`, gere novamente `dist/TailUI.executor.lua`.
+## Keybind Sets (Novo)
 
-## Visao Geral
+### API global
 
-Tail UI foi desenhada para hubs avancados:
+```lua
+ui:createKeybindSet("combat")
+ui:activateKeybindSet("combat")
 
-- Janela estilo Safari com topbar, bolinhas de controle e `TopMenuOpenButton`.
-- Layout inteligente para desktop e mobile (resize + breakpoint responsivo).
-- Sistema de Tabs, Sections, Folders e componentes de formulario.
-- Search in UI com fuzzy matching (aceita erro de digitacao).
-- Sistema de tags na topbar (`icone + texto + pill`).
-- Loading screens por API de configuracao.
-- Theme Engine com criacao, aplicacao e persistencia em disco.
-- Storage API com `makefolder`, `writefile`, `readfile`.
-- Core Execution Isolation: erro em callback nao derruba a UI.
+ui:bindKeybind("combat", {
+    id = "dash",
+    title = "Dash",
+    key = Enum.KeyCode.Q,
+    callback = function()
+        print("Dash")
+    end
+})
+```
 
-## Destaques Tecnicos
+### API de seção
 
-### 1) Arquitetura Safari
+```lua
+sec:addKeybind({
+    title = "Panic Key",
+    set = "global",
+    key = Enum.KeyCode.End,
+    callback = function()
+        print("Panic action")
+    end
+})
+```
 
-- Topbar com botoes close/minimize/maximize.
-- Janela com cantos arredondados, stroke e hierarquia visual limpa.
-- Botao `TopMenuOpenButton` quando a UI e minimizada.
+## API Nova de Janela
 
-### 2) Mobile + Responsivo
+```lua
+window:setTransparency(0.12)          -- ou setOpacity
+window:setSidebarWidth(200, 150)      -- desktop, mobile
+window:setSearchPlaceholder("Search controls...")
+window:setFullscreenDarkTheme("midnight-pro")
+window:runLoadingSequence({ "A", "B", "C" })
+```
 
-- Breakpoint configuravel via `internal.mobileBreakpoint`.
-- Ajuste automatico de tamanho e distribuicao lateral.
-- Resize manual (handle no canto) em desktop.
+## Temas (Dark Pack)
 
-### 3) Search in UI (Fuzzy)
+Temas built-in:
 
-- Indexa tabs, sections, tags e controles.
-- Busca por similaridade textual (nao depende de regex).
-- Permite localizar funcoes mesmo com digitacao imperfeita.
-- Pode ser ativada/desativada via API.
+- `midnight-pro` (padrão)
+- `carbon-night`
+- `neon-obsidian`
 
-### 4) Theme System
+Aplicação:
 
-- Registro em runtime: `registerTheme`.
-- Aplicacao dinamica: `applyTheme`.
-- Persistencia de tema em pasta (`theme.json`).
-- Carregamento de temas locais na inicializacao.
+```lua
+ui:applyTheme("carbon-night")
+```
 
-### 5) Icones e Fontes
+Custom:
 
-- Compatibilidade nativa com Lucide (fallback textual).
-- Ate 5 bibliotecas externas de icones alem de Lucide.
-- Ate 5 fontes externas alem do pack padrao.
+```lua
+ui:registerTheme("my-theme", {
+    meta = { name = "My Theme", dark = true },
+    colors = {
+        background = Color3.fromRGB(10, 13, 18),
+        surface = Color3.fromRGB(16, 19, 25),
+        topbar = Color3.fromRGB(8, 10, 14),
+        sidebar = Color3.fromRGB(9, 12, 16),
+        text = Color3.fromRGB(232, 241, 252),
+        textMuted = Color3.fromRGB(132, 147, 171),
+        border = Color3.fromRGB(36, 48, 66),
+        accent = Color3.fromRGB(42, 161, 255),
+        success = Color3.fromRGB(54, 170, 122),
+        warning = Color3.fromRGB(242, 179, 64),
+        danger = Color3.fromRGB(220, 90, 92),
+        searchHighlight = Color3.fromRGB(80, 145, 255),
+        overlay = Color3.fromRGB(6, 8, 12),
+    },
+    rounding = { window = 18, card = 14, pill = 999 },
+}, { persist = true })
+```
 
-### 6) Execution Isolation
+## Storage API
 
-- Callbacks protegidos por `pcall` centralizado.
-- Erros sao logados com contexto.
-- Componente que falha pode ser desativado sem matar a UI.
-- Label de erro detalhada aparece dentro da propria UI.
+```lua
+local root = ui:getHubRoot()
+ui:makeFolder(root .. "/profiles")
+ui:writeJSON(root .. "/profiles/default.json", { theme = ui:getConfig("theme.active") })
+local profile = ui:readJSON(root .. "/profiles/default.json", {})
+```
 
-## Estrutura do Projeto
+## Runtime / Executor Info
+
+```lua
+local runtime = ui:getRuntimeInfo()
+print(runtime.executor)
+print(runtime.capabilities.getgc, runtime.capabilities.gethui)
+```
+
+## Estrutura
 
 ```text
 dist/
   TailUI.pathloader.lua
-  TailUI.executor.lua
-tools/
-  build_executor_bundle.ps1
 src/
-  init.lua
   TailUI.lua
+  Executor/
+    Runtime.lua
+  Input/
+    KeybindManager.lua
   Core/
-    Logger.lua
-    SafeCall.lua
-    FileSystem.lua
-    ConfigManager.lua
   Theme/
-    BuiltinThemes.lua
-    ThemeManager.lua
   Assets/
-    IconRegistry.lua
-    FontRegistry.lua
   UI/
-    Window.lua
-    FuzzySearch.lua
-    LoadingOverlay.lua
 examples/
+  full_test_executor.lua
   quickstart.lua
   static_api.lua
 ```
 
-## Estrutura Runtime (disco)
+## Observações de Produção
 
-Quando inicializa com `hubName = "MeuHub"`, a lib cria:
-
-```text
-workspace/meuhub/
-  bin/
-    configurations.config
-  themes/
-    initate.lua
-    <nome-do-tema>/
-      theme.json
-  cache/
-  logs/
-```
-
-### Arquivos importantes
-
-- `workspace/<hub>/bin/configurations.config`
-  - Config principal da UI (tema ativo, flags internas, etc).
-- `workspace/<hub>/themes/initate.lua`
-  - Bootstrap do sistema de temas locais.
-- `workspace/<hub>/themes/<tema>/theme.json`
-  - Tema custom que pode ser aplicado por API.
-
-## API Rapida
-
-## Bootstrap
-
-```lua
-local TailUI = require(path.to.src.TailUI)
-
-local ui = TailUI.new({
-  hubName = "MeuHub",
-})
-
-local window = ui:tailwindow({
-  title = "Meu Hub",
-  subtitle = "Tail UI - Safari",
-  searchEnabled = true,
-})
-```
-
-## Estilo `Window.tailwindow(...)`
-
-```lua
-local Window = require(path.to.src.TailUI)
-
-local win = Window.tailwindow({
-  hubName = "MeuHubStatic",
-  title = "Static Window API",
-  searchEnabled = true,
-})
-```
-
-## Tabs / Sections / Components
-
-```lua
-local tab = window:addTab({ title = "Main", icon = "settings" })
-local section = tab:addSection({ title = "Gameplay", description = "Core options" })
-
-section:addToggle({
-  title = "Auto Farm",
-  default = false,
-  callback = function(state) print(state) end,
-})
-
-section:addSlider({
-  title = "Walk Speed",
-  min = 16, max = 120, step = 1, default = 24,
-  callback = function(value) print(value) end,
-})
-
-section:addDropdown({
-  title = "Target Team",
-  options = { "Alpha", "Bravo", "Charlie" },
-  callback = function(opt) print(opt) end,
-})
-```
-
-## Tags na Topbar
-
-```lua
-window:addTag({
-  icon = "theme",
-  text = "BETA",
-  width = 90,
-})
-```
-
-## Temas dinamicos
-
-```lua
-ui:registerTheme("my-custom", {
-  meta = { name = "My Custom" },
-  colors = {
-    background = Color3.fromRGB(228, 234, 241),
-    surface = Color3.fromRGB(245, 249, 255),
-    topbar = Color3.fromRGB(220, 228, 238),
-    text = Color3.fromRGB(29, 40, 53),
-    textMuted = Color3.fromRGB(90, 107, 128),
-    border = Color3.fromRGB(179, 194, 214),
-    accent = Color3.fromRGB(52, 120, 245),
-    success = Color3.fromRGB(54, 170, 122),
-    warning = Color3.fromRGB(242, 179, 64),
-    danger = Color3.fromRGB(220, 90, 92),
-    searchHighlight = Color3.fromRGB(80, 145, 255),
-  },
-  rounding = { window = 14, card = 10, pill = 999 },
-}, { persist = true })
-
-ui:applyTheme("my-custom")
-```
-
-## Storage API (writefile/readfile/makefolder)
-
-```lua
-local root = ui:getHubRoot()
-
-ui:makeFolder(root .. "/profiles")
-ui:writeJSON(root .. "/profiles/default.json", {
-  theme = ui:getConfig("theme.active"),
-})
-
-local data = ui:readJSON(root .. "/profiles/default.json", {})
-```
-
-## Icones e Fontes
-
-```lua
-ui:registerIconLibrary("my-icons", {
-  sword = "⚔",
-  gem = "◆",
-})
-
-ui:registerFont("my-font", Enum.Font.FredokaOne)
-```
-
-## Loading Screen por API
-
-```lua
-local window = ui:tailwindow({
-  title = "Meu Hub",
-  loading = { enabled = true },
-})
-
-window:runLoadingSequence({
-  "Checking modules",
-  "Syncing themes",
-  "Boot complete",
-})
-```
-
-## Principais Metodos
-
-- `TailUI.new(options)`
-- `TailUI.tailwindow(options)` (singleton)
-- `TailUI.getSingleton(options)` (singleton explicito)
-- `ui:tailwindow(options)` / `ui:createWindow(options)`
-- `ui:registerTheme(name, data, opts)`
-- `ui:applyTheme(name, overrides?)`
-- `ui:registerIconLibrary(name, provider)`
-- `ui:registerFont(name, fontEnum)`
-- `ui:getConfig(path?)` / `ui:setConfig(path, value, shouldSave?)`
-- `ui:makeFolder(path)` / `ui:writeFile(path, content)` / `ui:readFile(path, default?)`
-- `ui:writeJSON(path, data)` / `ui:readJSON(path, default?)`
-- `ui:getStorageAPI()`
-- `window:addTag(...)`
-- `window:addTab(...)`
-- `window:setSearchEnabled(boolean)`
-- `window:runLoadingSequence({...})`
-
-## Observacoes
-
-- A UI foi feita para modularidade e extensao.
-- O sistema prioriza resiliencia: erros locais sao isolados.
-- O projeto esta pronto para evoluir com novos componentes/telas.
-
----
-
-Tail UI Library: Safari-like, modular, advanced and ready for production hubs.
+- Recomendado para executores modernos com suporte robusto a UI/IO.
+- `pathloader` possui fallback HTTP via `request/http_request/syn.request`.
+- Para atualização de release, mantenha `dist/TailUI.pathloader.lua` + `src/` sincronizados no repo.

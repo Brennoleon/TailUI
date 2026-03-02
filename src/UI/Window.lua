@@ -60,10 +60,18 @@ local function pickGuiParent(fallback)
 	return CoreGui
 end
 
-local function protectExecutorGui(gui)
+local function protectExecutorGui(gui, runtime)
+	if runtime and type(runtime.protectGui) == "function" then
+		local okProtected = runtime:protectGui(gui)
+		if okProtected then
+			return
+		end
+	end
+
 	local syn = readGlobal("syn")
 	if type(syn) == "table" and type(syn.protect_gui) == "function" then
 		pcall(syn.protect_gui, gui)
+		return
 	end
 
 	local protectgui = readGlobal("protectgui")
@@ -144,6 +152,8 @@ function Window.new(context, options)
 	self.themeManager = context.themeManager
 	self.iconRegistry = context.iconRegistry
 	self.fontRegistry = context.fontRegistry
+	self.keybindManager = context.keybindManager
+	self.runtime = context.runtime
 	self.config = context.config
 
 	self.connections = {}
@@ -166,15 +176,24 @@ function Window.new(context, options)
 		self.searchEnabled = options.searchEnabled
 	end
 
-	self.topbarHeight = options.topbarHeight or 42
-	self.sidebarWidth = options.sidebarWidth or 188
-	self.mobileSidebarWidth = options.mobileSidebarWidth or 148
+	self.topbarHeight = options.topbarHeight or 40
+	self.sidebarWidth = options.sidebarWidth or 184
+	self.mobileSidebarWidth = options.mobileSidebarWidth or 142
+	self.fullscreenDarkTheme = options.fullscreenDarkTheme or "midnight-pro"
+	if options.forceDarkOnFullscreen == nil then
+		self.forceDarkOnFullscreen = self.config.window.forceDarkOnFullscreen ~= false
+	else
+		self.forceDarkOnFullscreen = options.forceDarkOnFullscreen == true
+	end
+	self.themeBeforeFullscreen = nil
+	self.uiTransparency = tonumber(options.transparency or self.config.window.defaultTransparency or 0.06) or 0.06
 
 	self:_build()
 	self:_watchTheme()
 	self:_applyTheme(self.theme)
 	self:_applyResponsive()
 	self:setSearchEnabled(self.searchEnabled)
+	self:setTransparency(self.uiTransparency)
 
 	return self
 end
@@ -233,6 +252,10 @@ function Window:_applyTheme(theme)
 	if self.activeTab then
 		self:_activateTab(self.activeTab)
 	end
+
+	if self.uiTransparency then
+		self:setTransparency(self.uiTransparency)
+	end
 end
 
 function Window:_watchTheme()
@@ -257,14 +280,14 @@ function Window:_build()
 	self.screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	self.screenGui.IgnoreGuiInset = true
 	self.screenGui.Parent = parent
-	protectExecutorGui(self.screenGui)
+	protectExecutorGui(self.screenGui, self.runtime)
 
 	local showLoading = self.config.internal.showLoading ~= false
 	if self.options.loading and self.options.loading.enabled == false then
 		showLoading = false
 	end
 	if showLoading then
-		self.loadingOverlay = LoadingOverlay.new(self.screenGui, self.theme, self.boldFont)
+		self.loadingOverlay = LoadingOverlay.new(self.screenGui, self.theme, self.boldFont, self.options.loading)
 		self.loadingOverlay:show("Initializing Tail UI...")
 		self.loadingOverlay:step(1, 5, "Creating window")
 	end
@@ -277,13 +300,13 @@ function Window:_build()
 	self.main.ClipsDescendants = true
 	self.main.BorderSizePixel = 0
 	self.main.Parent = self.screenGui
-	corner(self.main, token(self.theme, "rounding.window", 16))
+	corner(self.main, token(self.theme, "rounding.window", 18))
 	stroke(self.main, token(self.theme, "colors.border", Color3.fromRGB(170, 176, 188)), 0.15)
-	self:_bindTheme(self.main, "BackgroundColor3", "colors.surface", Color3.fromRGB(250, 251, 253))
+	self:_bindTheme(self.main, "BackgroundColor3", "colors.background", Color3.fromRGB(250, 251, 253))
 
 	self.openButton = Instance.new("TextButton")
 	self.openButton.Name = "TopMenuOpenButton"
-	self.openButton.Size = UDim2.fromOffset(154, 34)
+	self.openButton.Size = UDim2.fromOffset(140, 32)
 	self.openButton.Position = UDim2.fromOffset(14, 14)
 	self.openButton.Font = self.boldFont
 	self.openButton.TextSize = 13
@@ -291,7 +314,7 @@ function Window:_build()
 	self.openButton.BorderSizePixel = 0
 	self.openButton.Visible = false
 	self.openButton.Parent = self.screenGui
-	corner(self.openButton, 10)
+	corner(self.openButton, 12)
 	stroke(self.openButton, token(self.theme, "colors.border", Color3.fromRGB(170, 176, 188)), 0.2)
 	self:_bindTheme(self.openButton, "BackgroundColor3", "colors.topbar", Color3.fromRGB(230, 235, 240))
 	self:_bindTheme(self.openButton, "TextColor3", "colors.text", Color3.fromRGB(22, 22, 24))
@@ -317,8 +340,8 @@ function Window:_build()
 
 	local home = self:addTab({ id = "home", title = "Home", icon = "folder" })
 	home:addLabel({
-		text = "Tail UI initialized.",
-		description = "Use addTab/addSection and the components API.",
+		text = "Tail UI v2 ready.",
+		description = "Dark executor UI loaded. Add tabs, controls, keybinds and themes.",
 	})
 
 	if self.loadingOverlay then
@@ -336,10 +359,18 @@ function Window:_buildTopbar()
 	self.topbar.Parent = self.main
 	self:_bindTheme(self.topbar, "BackgroundColor3", "colors.topbar", Color3.fromRGB(230, 235, 240))
 
+	local topbarBorder = Instance.new("Frame")
+	topbarBorder.Name = "BottomBorder"
+	topbarBorder.Size = UDim2.new(1, 0, 0, 1)
+	topbarBorder.Position = UDim2.new(0, 0, 1, -1)
+	topbarBorder.BorderSizePixel = 0
+	topbarBorder.Parent = self.topbar
+	self:_bindTheme(topbarBorder, "BackgroundColor3", "colors.border", Color3.fromRGB(43, 49, 63))
+
 	local circles = Instance.new("Frame")
 	circles.Name = "SafariCircles"
-	circles.Size = UDim2.fromOffset(86, 18)
-	circles.Position = UDim2.fromOffset(12, math.floor((self.topbarHeight - 18) * 0.5))
+	circles.Size = UDim2.fromOffset(82, 16)
+	circles.Position = UDim2.fromOffset(12, math.floor((self.topbarHeight - 16) * 0.5))
 	circles.BackgroundTransparency = 1
 	circles.Parent = self.topbar
 
@@ -352,7 +383,7 @@ function Window:_buildTopbar()
 	local function circle(name, color, callback)
 		local button = Instance.new("TextButton")
 		button.Name = name
-		button.Size = UDim2.fromOffset(13, 13)
+		button.Size = UDim2.fromOffset(12, 12)
 		button.Text = ""
 		button.BorderSizePixel = 0
 		button.BackgroundColor3 = color
@@ -435,8 +466,8 @@ function Window:_buildBody()
 	self.sidebar.Size = UDim2.new(0, self.sidebarWidth, 1, 0)
 	self.sidebar.BorderSizePixel = 0
 	self.sidebar.Parent = self.body
-	self:_bindTheme(self.sidebar, "BackgroundColor3", "colors.background", Color3.fromRGB(237, 242, 248))
-	corner(self.sidebar, 12)
+	self:_bindTheme(self.sidebar, "BackgroundColor3", "colors.sidebar", Color3.fromRGB(12, 14, 18))
+	corner(self.sidebar, 14)
 
 	self.sidebarPane = Instance.new("Frame")
 	self.sidebarPane.Name = "SidebarPane"
@@ -444,17 +475,17 @@ function Window:_buildBody()
 	self.sidebarPane.Position = UDim2.fromOffset(5, 5)
 	self.sidebarPane.BorderSizePixel = 0
 	self.sidebarPane.Parent = self.sidebar
-	corner(self.sidebarPane, 10)
+	corner(self.sidebarPane, 12)
 	stroke(self.sidebarPane, token(self.theme, "colors.border", Color3.fromRGB(172, 182, 196)), 0.28)
 	self:_bindTheme(self.sidebarPane, "BackgroundColor3", "colors.surface", Color3.fromRGB(248, 250, 255))
 
 	self.searchHost = Instance.new("Frame")
 	self.searchHost.Name = "SearchHost"
-	self.searchHost.Size = UDim2.new(1, -12, 0, 30)
+	self.searchHost.Size = UDim2.new(1, -12, 0, 32)
 	self.searchHost.Position = UDim2.fromOffset(6, 6)
 	self.searchHost.BorderSizePixel = 0
 	self.searchHost.Parent = self.sidebarPane
-	corner(self.searchHost, 9)
+	corner(self.searchHost, 10)
 	stroke(self.searchHost, token(self.theme, "colors.border", Color3.fromRGB(172, 182, 196)), 0.28)
 	self:_bindTheme(self.searchHost, "BackgroundColor3", "colors.background", Color3.fromRGB(241, 246, 252))
 	setTreeZIndex(self.searchHost, 20)
@@ -488,8 +519,8 @@ function Window:_buildBody()
 
 	self.tabsList = Instance.new("ScrollingFrame")
 	self.tabsList.Name = "TabsList"
-	self.tabsList.Size = UDim2.new(1, -12, 1, -48)
-	self.tabsList.Position = UDim2.fromOffset(6, 42)
+	self.tabsList.Size = UDim2.new(1, -12, 1, -50)
+	self.tabsList.Position = UDim2.fromOffset(6, 44)
 	self.tabsList.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	self.tabsList.CanvasSize = UDim2.new()
 	self.tabsList.ScrollBarThickness = 2
@@ -514,9 +545,19 @@ function Window:_buildBody()
 	self.content.BorderSizePixel = 0
 	self.content.Parent = self.body
 
+	self.contentPanel = Instance.new("Frame")
+	self.contentPanel.Name = "ContentPanel"
+	self.contentPanel.Size = UDim2.new(1, -10, 1, -10)
+	self.contentPanel.Position = UDim2.fromOffset(5, 5)
+	self.contentPanel.BorderSizePixel = 0
+	self.contentPanel.Parent = self.content
+	corner(self.contentPanel, 14)
+	stroke(self.contentPanel, token(self.theme, "colors.border", Color3.fromRGB(43, 49, 63)), 0.24)
+	self:_bindTheme(self.contentPanel, "BackgroundColor3", "colors.surface", Color3.fromRGB(17, 20, 26))
+
 	self.searchResults = Instance.new("ScrollingFrame")
 	self.searchResults.Name = "SearchResults"
-	self.searchResults.Size = UDim2.new(0, self.sidebarWidth - 16, 0, 180)
+	self.searchResults.Size = UDim2.new(0, self.sidebarWidth - 16, 0, 192)
 	self.searchResults.Position = UDim2.fromOffset(8, self.topbarHeight + 36)
 	self.searchResults.Visible = false
 	self.searchResults.ScrollBarThickness = 2
@@ -524,7 +565,7 @@ function Window:_buildBody()
 	self.searchResults.CanvasSize = UDim2.new()
 	self.searchResults.BorderSizePixel = 0
 	self.searchResults.Parent = self.screenGui
-	corner(self.searchResults, 10)
+	corner(self.searchResults, 12)
 	stroke(self.searchResults, token(self.theme, "colors.border", Color3.fromRGB(172, 182, 196)), 0.18)
 	self:_bindTheme(self.searchResults, "BackgroundColor3", "colors.surface", Color3.fromRGB(248, 250, 255))
 	self.searchResults.ZIndex = 60
@@ -546,10 +587,32 @@ function Window:_buildBody()
 	self.pagesHost.Position = UDim2.fromOffset(5, 5)
 	self.pagesHost.BackgroundTransparency = 1
 	self.pagesHost.BorderSizePixel = 0
-	self.pagesHost.Parent = self.content
+	self.pagesHost.Parent = self.contentPanel
 
 	self:_connect(self.searchInput:GetPropertyChangedSignal("Text"), function()
 		self:_refreshSearch()
+	end)
+
+	self:_connect(UserInputService.InputBegan, function(input)
+		if not self.searchResults.Visible then
+			return
+		end
+		if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then
+			return
+		end
+
+		local pos = input.Position
+		local function contains(gui)
+			local p = gui.AbsolutePosition
+			local s = gui.AbsoluteSize
+			return pos.X >= p.X and pos.X <= (p.X + s.X) and pos.Y >= p.Y and pos.Y <= (p.Y + s.Y)
+		end
+
+		if contains(self.searchHost) or contains(self.searchResults) then
+			return
+		end
+
+		self.searchResults.Visible = false
 	end)
 
 	self:_updateSearchOverlayPosition()
@@ -561,7 +624,7 @@ function Window:_updateSearchOverlayPosition()
 	end
 	local absolute = self.searchHost.AbsolutePosition
 	self.searchResults.Position = UDim2.fromOffset(absolute.X, absolute.Y + self.searchHost.AbsoluteSize.Y + 4)
-	self.searchResults.Size = UDim2.fromOffset(self.searchHost.AbsoluteSize.X, 180)
+	self.searchResults.Size = UDim2.fromOffset(self.searchHost.AbsoluteSize.X, 192)
 end
 
 function Window:_buildErrorLabel()
@@ -576,7 +639,7 @@ function Window:_buildErrorLabel()
 	self.errorLabel.Font = self.font
 	self.errorLabel.TextSize = 12
 	self.errorLabel.BorderSizePixel = 0
-	self.errorLabel.Parent = self.content
+	self.errorLabel.Parent = self.contentPanel
 	corner(self.errorLabel, 9)
 	self.errorLabel.ZIndex = 30
 	self:_bindTheme(self.errorLabel, "TextColor3", "colors.danger", Color3.fromRGB(231, 95, 95))
@@ -674,7 +737,7 @@ function Window:_bindResizeAndDrag()
 		self.resizeHandle.Position = UDim2.new(1, -4, 1, -4)
 		self.resizeHandle.BorderSizePixel = 0
 		self.resizeHandle.Parent = self.main
-		corner(self.resizeHandle, 8)
+		corner(self.resizeHandle, 10)
 		self:_bindTheme(self.resizeHandle, "BackgroundColor3", "colors.topbar", Color3.fromRGB(230, 235, 240))
 
 		local resizing = false
@@ -777,6 +840,20 @@ end
 
 function Window:toggleMaximized()
 	self.maximized = not self.maximized
+
+	if self.forceDarkOnFullscreen then
+		if self.maximized then
+			local activeName = self.themeManager:getActiveName()
+			if activeName ~= self.fullscreenDarkTheme then
+				self.themeBeforeFullscreen = activeName
+				self:applyTheme(self.fullscreenDarkTheme)
+			end
+		elseif self.themeBeforeFullscreen then
+			self:applyTheme(self.themeBeforeFullscreen)
+			self.themeBeforeFullscreen = nil
+		end
+	end
+
 	self:_applyResponsive()
 end
 
@@ -785,8 +862,8 @@ function Window:setSearchEnabled(enabled)
 	self.searchHost.Visible = self.searchEnabled
 
 	if self.searchEnabled then
-		self.tabsList.Size = UDim2.new(1, -12, 1, -48)
-		self.tabsList.Position = UDim2.fromOffset(6, 42)
+		self.tabsList.Size = UDim2.new(1, -12, 1, -50)
+		self.tabsList.Position = UDim2.fromOffset(6, 44)
 	else
 		self.tabsList.Size = UDim2.new(1, -12, 1, -12)
 		self.tabsList.Position = UDim2.fromOffset(6, 6)
@@ -795,6 +872,52 @@ function Window:setSearchEnabled(enabled)
 	end
 
 	self:_updateSearchOverlayPosition()
+end
+
+function Window:setFullscreenDarkTheme(themeName)
+	self.fullscreenDarkTheme = tostring(themeName or "midnight-pro")
+end
+
+function Window:setTransparency(value)
+	local amount = tonumber(value) or 0
+	amount = math.clamp(amount, 0, 0.88)
+	self.uiTransparency = amount
+
+	local function apply(instance, base)
+		if instance then
+			instance.BackgroundTransparency = math.clamp((base or 0) + amount, 0, 0.97)
+		end
+	end
+
+	apply(self.main, 0)
+	apply(self.topbar, 0)
+	apply(self.sidebar, 0)
+	apply(self.sidebarPane, 0)
+	apply(self.searchHost, 0)
+	apply(self.searchResults, 0)
+	apply(self.contentPanel, 0)
+end
+
+function Window:setOpacity(value)
+	self:setTransparency(value)
+end
+
+function Window:setSearchPlaceholder(text)
+	if self.searchInput then
+		self.searchInput.PlaceholderText = tostring(text or "Search...")
+	end
+end
+
+function Window:setSidebarWidth(width, mobileWidth)
+	local nextWidth = tonumber(width)
+	if nextWidth then
+		self.sidebarWidth = math.clamp(nextWidth, 140, 320)
+	end
+	local nextMobile = tonumber(mobileWidth)
+	if nextMobile then
+		self.mobileSidebarWidth = math.clamp(nextMobile, 120, 260)
+	end
+	self:_applyResponsive()
 end
 
 function Window:reportError(scope, message)
@@ -828,7 +951,7 @@ function Window:_renderSearchResults(results)
 		local entry = row.entry
 		local button = Instance.new("TextButton")
 		button.Name = "SearchResult"
-		button.Size = UDim2.new(1, 0, 0, 30)
+		button.Size = UDim2.new(1, 0, 0, 31)
 		button.TextXAlignment = Enum.TextXAlignment.Left
 		button.TextSize = 13
 		button.Font = self.font
@@ -840,7 +963,7 @@ function Window:_renderSearchResults(results)
 			entry.kind or "item"
 		)
 		button.Parent = self.searchResults
-		corner(button, 7)
+		corner(button, 9)
 		button.ZIndex = 61
 		self:_bindTheme(button, "BackgroundColor3", "colors.background", Color3.fromRGB(241, 246, 252))
 		self:_bindTheme(button, "TextColor3", "colors.text", Color3.fromRGB(22, 22, 24))
@@ -965,7 +1088,7 @@ function Window:addTab(tabOptions)
 	button.TextSize = 13
 	button.Text = ("  %s  %s"):format(self.iconRegistry:resolve(iconName), title)
 	button.Parent = self.tabsList
-	corner(button, 8)
+	corner(button, 10)
 	self:_bindTheme(button, "TextColor3", "colors.text", Color3.fromRGB(22, 22, 24))
 	self:_bindTheme(button, "BackgroundColor3", "colors.surface", Color3.fromRGB(250, 251, 253))
 
@@ -1048,10 +1171,31 @@ function Window:applyTheme(name, overrides)
 	return ok, err
 end
 
+function Window:createKeybindSet(name)
+	if not self.keybindManager then
+		return false, "keybind manager unavailable"
+	end
+	return self.keybindManager:registerSet(name)
+end
+
+function Window:activateKeybindSet(name)
+	if not self.keybindManager then
+		return false, "keybind manager unavailable"
+	end
+	return self.keybindManager:setActiveSet(name)
+end
+
+function Window:bindKeybind(setName, options)
+	if not self.keybindManager then
+		return nil, "keybind manager unavailable"
+	end
+	return self.keybindManager:bind(setName, options)
+end
+
 function Window:runLoadingSequence(steps)
 	steps = steps or {}
 	if not self.loadingOverlay then
-		self.loadingOverlay = LoadingOverlay.new(self.screenGui, self.theme, self.boldFont)
+		self.loadingOverlay = LoadingOverlay.new(self.screenGui, self.theme, self.boldFont, self.options.loading)
 	end
 
 	self.loadingOverlay:show("Processing...")
@@ -1102,7 +1246,7 @@ function Tab:addSection(sectionOptions)
 	frame.AutomaticSize = Enum.AutomaticSize.Y
 	frame.BorderSizePixel = 0
 	frame.Parent = self.page
-	corner(frame, token(self.window.theme, "rounding.card", 12))
+	corner(frame, token(self.window.theme, "rounding.card", 14))
 	stroke(frame, token(self.window.theme, "colors.border", Color3.fromRGB(176, 185, 198)), 0.2)
 	self.window:_bindTheme(frame, "BackgroundColor3", "colors.surface", Color3.fromRGB(248, 250, 255))
 
@@ -1309,7 +1453,7 @@ function Section:addButton(buttonOptions)
 	button.Font = self.window.boldFont
 	button.TextSize = 13
 	button.Parent = frame
-	corner(button, 8)
+	corner(button, 10)
 	self.window:_bindTheme(button, "TextColor3", "colors.surface", Color3.fromRGB(255, 255, 255))
 	self.window:_bindTheme(button, "BackgroundColor3", "colors.accent", Color3.fromRGB(84, 148, 255))
 
@@ -1490,7 +1634,7 @@ function Section:addInput(inputOptions)
 	box.PlaceholderText = tostring(inputOptions.placeholder or "Type here...")
 	box.BorderSizePixel = 0
 	box.Parent = frame
-	corner(box, 8)
+	corner(box, 10)
 	self.window:_bindTheme(box, "TextColor3", "colors.text", Color3.fromRGB(22, 22, 24))
 	self.window:_bindTheme(box, "PlaceholderColor3", "colors.textMuted", Color3.fromRGB(84, 94, 106))
 	self.window:_bindTheme(box, "BackgroundColor3", "colors.background", Color3.fromRGB(241, 246, 252))
@@ -1681,6 +1825,152 @@ function Section:addSlider(sliderOptions)
 	}
 end
 
+function Section:addKeybind(keybindOptions)
+	keybindOptions = keybindOptions or {}
+	local titleText = tostring(keybindOptions.title or "Keybind")
+	local setName = tostring(keybindOptions.set or keybindOptions.setName or "global"):lower()
+	local callback = keybindOptions.callback
+	local keyChanged = keybindOptions.onChanged
+	local enabled = keybindOptions.enabled ~= false
+
+	local frame = Instance.new("Frame")
+	frame.Name = "KeybindControl"
+	frame.Size = UDim2.new(1, 0, 0, 34)
+	frame.BackgroundTransparency = 1
+	frame.Parent = self.content
+
+	local label = Instance.new("TextLabel")
+	label.Name = "Title"
+	label.Size = UDim2.new(0.54, 0, 1, 0)
+	label.BackgroundTransparency = 1
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.Font = self.window.font
+	label.TextSize = 14
+	label.Text = titleText
+	label.Parent = frame
+	self.window:_bindTheme(label, "TextColor3", "colors.text", Color3.fromRGB(22, 22, 24))
+
+	local setLabel = Instance.new("TextLabel")
+	setLabel.Name = "Set"
+	setLabel.Size = UDim2.new(0.15, 0, 1, 0)
+	setLabel.Position = UDim2.new(0.54, 0, 0, 0)
+	setLabel.BackgroundTransparency = 1
+	setLabel.TextXAlignment = Enum.TextXAlignment.Right
+	setLabel.Font = self.window.font
+	setLabel.TextSize = 12
+	setLabel.Text = ("[%s]"):format(setName)
+	setLabel.Parent = frame
+	self.window:_bindTheme(setLabel, "TextColor3", "colors.textMuted", Color3.fromRGB(84, 94, 106))
+
+	local button = Instance.new("TextButton")
+	button.Name = "Key"
+	button.Size = UDim2.new(0.28, 0, 1, 0)
+	button.Position = UDim2.new(0.72, 0, 0, 0)
+	button.AutoButtonColor = true
+	button.BorderSizePixel = 0
+	button.Font = self.window.boldFont
+	button.TextSize = 12
+	button.Parent = frame
+	corner(button, 10)
+	self.window:_bindTheme(button, "BackgroundColor3", "colors.background", Color3.fromRGB(241, 246, 252))
+	self.window:_bindTheme(button, "TextColor3", "colors.text", Color3.fromRGB(22, 22, 24))
+
+	local okSet, errSet = self.window:createKeybindSet(setName)
+	if not okSet then
+		self.window:reportError("keybind.set", errSet or "failed to create keybind set")
+	end
+
+	local bindHandle, bindErr = self.window:bindKeybind(setName, {
+		id = keybindOptions.id or (self.tab.id .. "." .. titleText),
+		title = titleText,
+		key = keybindOptions.key or keybindOptions.defaultKey or Enum.KeyCode.Unknown,
+		callback = function(keyCode, input, activeSet)
+			if callback then
+				callback(keyCode, input, activeSet)
+			end
+		end,
+		enabled = enabled,
+	})
+
+	if not bindHandle then
+		self.window:reportError("keybind.bind", bindErr or "failed to bind key")
+		button.Text = "ERROR"
+		return {}
+	end
+
+	local function syncButtonText()
+		button.Text = bindHandle:GetKeyName()
+	end
+	syncButtonText()
+
+	local capturing = false
+
+	self.window:_connect(button.MouseButton1Click, function()
+		if not enabled then
+			return
+		end
+
+		capturing = true
+		button.Text = "PRESS KEY"
+		button.AutoButtonColor = false
+
+		self.window.keybindManager:captureNextKey(function(keyCode)
+			capturing = false
+			button.AutoButtonColor = enabled
+
+			if keyCode == Enum.KeyCode.Escape then
+				syncButtonText()
+				return
+			end
+
+			local ok, err = bindHandle:SetKey(keyCode)
+			if not ok then
+				self.window:reportError("keybind.capture", err or "invalid key")
+				syncButtonText()
+				return
+			end
+
+			syncButtonText()
+			if keyChanged then
+				pcall(keyChanged, keyCode, setName)
+			end
+		end)
+	end)
+
+	self:_registerControl("keybind", titleText, { "keybind", titleText, setName, bindHandle:GetKeyName() }, frame)
+
+	return {
+		SetKey = function(_, key)
+			local ok, err = bindHandle:SetKey(key)
+			if ok then
+				syncButtonText()
+			end
+			return ok, err
+		end,
+		GetKey = function()
+			return bindHandle:GetKeyCode()
+		end,
+		GetKeyName = function()
+			return bindHandle:GetKeyName()
+		end,
+		SetEnabled = function(_, flag)
+			enabled = flag == true
+			bindHandle:SetEnabled(enabled)
+			button.AutoButtonColor = enabled and not capturing
+			button.BackgroundTransparency = enabled and 0 or 0.45
+		end,
+		SetCallback = function(_, fn)
+			callback = fn
+		end,
+		Unbind = function()
+			bindHandle:Unbind()
+			button.Text = "UNBOUND"
+			enabled = false
+			button.AutoButtonColor = false
+		end,
+	}
+end
+
 function Section:addDropdown(dropdownOptions)
 	dropdownOptions = dropdownOptions or {}
 	local options = dropdownOptions.options or {}
@@ -1717,7 +2007,7 @@ function Section:addDropdown(dropdownOptions)
 	button.TextSize = 13
 	button.Text = "  " .. tostring(selected or "Select")
 	button.Parent = frame
-	corner(button, 8)
+	corner(button, 10)
 	self.window:_bindTheme(button, "TextColor3", "colors.text", Color3.fromRGB(22, 22, 24))
 	self.window:_bindTheme(button, "BackgroundColor3", "colors.background", Color3.fromRGB(241, 246, 252))
 
@@ -1728,7 +2018,7 @@ function Section:addDropdown(dropdownOptions)
 	pop.Visible = false
 	pop.BorderSizePixel = 0
 	pop.Parent = frame
-	corner(pop, 8)
+	corner(pop, 10)
 	stroke(pop, token(self.window.theme, "colors.border", Color3.fromRGB(176, 185, 198)), 0.2)
 	self.window:_bindTheme(pop, "BackgroundColor3", "colors.surface", Color3.fromRGB(248, 250, 255))
 
@@ -1848,6 +2138,14 @@ Window.AddTag = Window.addTag
 Window.AddTab = Window.addTab
 Window.SetSearchEnabled = Window.setSearchEnabled
 Window.ApplyTheme = Window.applyTheme
+Window.SetTransparency = Window.setTransparency
+Window.SetOpacity = Window.setOpacity
+Window.SetFullscreenDarkTheme = Window.setFullscreenDarkTheme
+Window.SetSearchPlaceholder = Window.setSearchPlaceholder
+Window.SetSidebarWidth = Window.setSidebarWidth
+Window.CreateKeybindSet = Window.createKeybindSet
+Window.ActivateKeybindSet = Window.activateKeybindSet
+Window.BindKeybind = Window.bindKeybind
 Window.RunLoadingSequence = Window.runLoadingSequence
 Window.Destroy = Window.destroy
 
@@ -1861,6 +2159,7 @@ Section.AddButton = Section.addButton
 Section.AddToggle = Section.addToggle
 Section.AddInput = Section.addInput
 Section.AddSlider = Section.addSlider
+Section.AddKeybind = Section.addKeybind
 Section.AddDropdown = Section.addDropdown
 
 return Window

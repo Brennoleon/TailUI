@@ -9,10 +9,15 @@ local ui = TailUI.getSingleton({
 
 local window = ui:tailwindow({
 	title = "Meu Hub",
-	subtitle = "Tail UI - Safari Architecture",
+	subtitle = "Tail UI - Executor Runtime",
 	searchEnabled = true,
+	forceDarkOnFullscreen = true,
+	transparency = 0.08,
 	loading = {
 		enabled = true,
+		title = "Tail UI v2",
+		subtitle = "Boot sequence",
+		icon = "*",
 	},
 })
 
@@ -44,6 +49,15 @@ controls:addToggle({
 	default = false,
 	callback = function(state)
 		print("Auto Farm:", state)
+	end,
+})
+
+controls:addKeybind({
+	title = "Panic Key",
+	set = "global",
+	key = Enum.KeyCode.End,
+	callback = function()
+		print("Panic pressed")
 	end,
 })
 
@@ -95,10 +109,10 @@ local themeFolder = themesTab:addFolder({
 })
 
 themeFolder:addButton({
-	title = "Apply Safari Sunrise",
+	title = "Apply Carbon Night",
 	text = "Apply",
 	callback = function()
-		ui:applyTheme("safari-sunrise")
+		ui:applyTheme("carbon-night")
 	end,
 })
 
@@ -109,21 +123,23 @@ themeFolder:addButton({
 		local customTheme = {
 			meta = { name = "MyCustom", author = "User" },
 			colors = {
-				background = Color3.fromRGB(228, 234, 241),
-				surface = Color3.fromRGB(245, 249, 255),
-				topbar = Color3.fromRGB(220, 228, 238),
-				text = Color3.fromRGB(29, 40, 53),
-				textMuted = Color3.fromRGB(90, 107, 128),
-				border = Color3.fromRGB(179, 194, 214),
-				accent = Color3.fromRGB(52, 120, 245),
+				background = Color3.fromRGB(10, 13, 18),
+				surface = Color3.fromRGB(16, 19, 25),
+				topbar = Color3.fromRGB(8, 10, 14),
+				sidebar = Color3.fromRGB(9, 12, 16),
+				text = Color3.fromRGB(232, 241, 252),
+				textMuted = Color3.fromRGB(132, 147, 171),
+				border = Color3.fromRGB(36, 48, 66),
+				accent = Color3.fromRGB(42, 161, 255),
 				success = Color3.fromRGB(54, 170, 122),
 				warning = Color3.fromRGB(242, 179, 64),
 				danger = Color3.fromRGB(220, 90, 92),
 				searchHighlight = Color3.fromRGB(80, 145, 255),
+				overlay = Color3.fromRGB(6, 8, 12),
 			},
 			rounding = {
-				window = 14,
-				card = 10,
+				window = 16,
+				card = 12,
 				pill = 999,
 			},
 		}

@@ -1,20 +1,22 @@
 local DEFAULT_CONFIG = {
 	internal = {
-		version = "1.0.0",
+		version = "2.0.0",
 		searchEnabled = true,
 		showLoading = true,
-		mobileBreakpoint = 840,
+		mobileBreakpoint = 860,
 	},
 	window = {
 		title = "Tail UI",
-		subtitle = "Safari inspired",
-		size = { width = 780, height = 520 },
-		minimumSize = { width = 520, height = 360 },
+		subtitle = "Executor UI Framework",
+		size = { width = 700, height = 440 },
+		minimumSize = { width = 460, height = 320 },
 		resizable = true,
 		draggable = true,
+		forceDarkOnFullscreen = true,
+		defaultTransparency = 0.08,
 	},
 	theme = {
-		active = "safari-ocean",
+		active = "midnight-pro",
 		autoLoadDiskThemes = true,
 	},
 	performance = {

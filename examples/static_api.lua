@@ -8,6 +8,7 @@ local uiWindow = Window.tailwindow({
 	title = "Static API Hub",
 	subtitle = "Window.tailwindow style",
 	searchEnabled = true,
+	forceDarkOnFullscreen = true,
 })
 
 local tab = uiWindow:addTab({
