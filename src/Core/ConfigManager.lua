@@ -8,8 +8,8 @@ local DEFAULT_CONFIG = {
 	window = {
 		title = "Tail UI",
 		subtitle = "Safari inspired",
-		size = { width = 940, height = 620 },
-		minimumSize = { width = 620, height = 420 },
+		size = { width = 780, height = 520 },
+		minimumSize = { width = 520, height = 360 },
 		resizable = true,
 		draggable = true,
 	},

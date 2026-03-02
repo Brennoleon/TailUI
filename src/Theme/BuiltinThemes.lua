@@ -18,8 +18,8 @@ return {
 			searchHighlight = Color3.fromRGB(89, 153, 255),
 		},
 		rounding = {
-			window = 14,
-			card = 10,
+			window = 16,
+			card = 12,
 			pill = 999,
 		},
 	},
@@ -42,8 +42,8 @@ return {
 			searchHighlight = Color3.fromRGB(235, 128, 89),
 		},
 		rounding = {
-			window = 14,
-			card = 10,
+			window = 16,
+			card = 12,
 			pill = 999,
 		},
 	},
@@ -66,8 +66,8 @@ return {
 			searchHighlight = Color3.fromRGB(121, 185, 255),
 		},
 		rounding = {
-			window = 14,
-			card = 10,
+			window = 16,
+			card = 12,
 			pill = 999,
 		},
 	},

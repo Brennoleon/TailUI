@@ -60,6 +60,18 @@ local function pickGuiParent(fallback)
 	return CoreGui
 end
 
+local function protectExecutorGui(gui)
+	local syn = readGlobal("syn")
+	if type(syn) == "table" and type(syn.protect_gui) == "function" then
+		pcall(syn.protect_gui, gui)
+	end
+
+	local protectgui = readGlobal("protectgui")
+	if type(protectgui) == "function" then
+		pcall(protectgui, gui)
+	end
+end
+
 local function token(theme, path, fallback)
 	local current = theme
 	for part in tostring(path):gmatch("[^%.]+") do
@@ -107,6 +119,20 @@ local function flatten(values)
 	return out
 end
 
+local function setTreeZIndex(root, zIndex)
+	if not root then
+		return
+	end
+	if root:IsA("GuiObject") then
+		root.ZIndex = zIndex
+	end
+	for _, child in ipairs(root:GetChildren()) do
+		if child:IsA("GuiObject") then
+			child.ZIndex = zIndex
+		end
+	end
+end
+
 function Window.new(context, options)
 	options = options or {}
 
@@ -139,6 +165,10 @@ function Window.new(context, options)
 	else
 		self.searchEnabled = options.searchEnabled
 	end
+
+	self.topbarHeight = options.topbarHeight or 42
+	self.sidebarWidth = options.sidebarWidth or 188
+	self.mobileSidebarWidth = options.mobileSidebarWidth or 148
 
 	self:_build()
 	self:_watchTheme()
@@ -227,6 +257,7 @@ function Window:_build()
 	self.screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 	self.screenGui.IgnoreGuiInset = true
 	self.screenGui.Parent = parent
+	protectExecutorGui(self.screenGui)
 
 	local showLoading = self.config.internal.showLoading ~= false
 	if self.options.loading and self.options.loading.enabled == false then
@@ -243,19 +274,20 @@ function Window:_build()
 	self.main.AnchorPoint = Vector2.new(0.5, 0.5)
 	self.main.Position = UDim2.fromScale(0.5, 0.5)
 	self.main.Size = UDim2.fromOffset(self.baseSize.X, self.baseSize.Y)
+	self.main.ClipsDescendants = true
 	self.main.BorderSizePixel = 0
 	self.main.Parent = self.screenGui
-	corner(self.main, token(self.theme, "rounding.window", 14))
+	corner(self.main, token(self.theme, "rounding.window", 16))
 	stroke(self.main, token(self.theme, "colors.border", Color3.fromRGB(170, 176, 188)), 0.15)
 	self:_bindTheme(self.main, "BackgroundColor3", "colors.surface", Color3.fromRGB(250, 251, 253))
 
 	self.openButton = Instance.new("TextButton")
 	self.openButton.Name = "TopMenuOpenButton"
-	self.openButton.Size = UDim2.fromOffset(176, 36)
+	self.openButton.Size = UDim2.fromOffset(154, 34)
 	self.openButton.Position = UDim2.fromOffset(14, 14)
 	self.openButton.Font = self.boldFont
-	self.openButton.TextSize = 15
-	self.openButton.Text = self.iconRegistry:resolve("maximize") .. " Open Tail UI"
+	self.openButton.TextSize = 13
+	self.openButton.Text = self.iconRegistry:resolve("maximize") .. "  Open"
 	self.openButton.BorderSizePixel = 0
 	self.openButton.Visible = false
 	self.openButton.Parent = self.screenGui
@@ -299,7 +331,7 @@ end
 function Window:_buildTopbar()
 	self.topbar = Instance.new("Frame")
 	self.topbar.Name = "Topbar"
-	self.topbar.Size = UDim2.new(1, 0, 0, 46)
+	self.topbar.Size = UDim2.new(1, 0, 0, self.topbarHeight)
 	self.topbar.BorderSizePixel = 0
 	self.topbar.Parent = self.main
 	self:_bindTheme(self.topbar, "BackgroundColor3", "colors.topbar", Color3.fromRGB(230, 235, 240))
@@ -307,7 +339,7 @@ function Window:_buildTopbar()
 	local circles = Instance.new("Frame")
 	circles.Name = "SafariCircles"
 	circles.Size = UDim2.fromOffset(86, 18)
-	circles.Position = UDim2.fromOffset(12, 14)
+	circles.Position = UDim2.fromOffset(12, math.floor((self.topbarHeight - 18) * 0.5))
 	circles.BackgroundTransparency = 1
 	circles.Parent = self.topbar
 
@@ -342,17 +374,17 @@ function Window:_buildTopbar()
 	local titleBox = Instance.new("Frame")
 	titleBox.Name = "TitleBox"
 	titleBox.BackgroundTransparency = 1
-	titleBox.Size = UDim2.new(1, -320, 1, 0)
+	titleBox.Size = UDim2.new(1, -288, 1, 0)
 	titleBox.Position = UDim2.fromOffset(108, 0)
 	titleBox.Parent = self.topbar
 
 	local title = Instance.new("TextLabel")
 	title.Name = "Title"
 	title.BackgroundTransparency = 1
-	title.Size = UDim2.new(1, 0, 0, 22)
-	title.Position = UDim2.fromOffset(0, 4)
+	title.Size = UDim2.new(1, 0, 0, 20)
+	title.Position = UDim2.fromOffset(0, 3)
 	title.Font = self.boldFont
-	title.TextSize = 18
+	title.TextSize = 16
 	title.TextXAlignment = Enum.TextXAlignment.Left
 	title.Text = self.options.title or self.config.window.title
 	title.Parent = titleBox
@@ -361,10 +393,10 @@ function Window:_buildTopbar()
 	local subtitle = Instance.new("TextLabel")
 	subtitle.Name = "Subtitle"
 	subtitle.BackgroundTransparency = 1
-	subtitle.Size = UDim2.new(1, 0, 0, 16)
-	subtitle.Position = UDim2.fromOffset(0, 24)
+	subtitle.Size = UDim2.new(1, 0, 0, 14)
+	subtitle.Position = UDim2.fromOffset(0, 22)
 	subtitle.Font = self.font
-	subtitle.TextSize = 12
+	subtitle.TextSize = 11
 	subtitle.TextXAlignment = Enum.TextXAlignment.Left
 	subtitle.Text = self.options.subtitle or self.config.window.subtitle
 	subtitle.Parent = titleBox
@@ -375,7 +407,7 @@ function Window:_buildTopbar()
 	self.tagsHost.BackgroundTransparency = 1
 	self.tagsHost.AnchorPoint = Vector2.new(1, 0)
 	self.tagsHost.Position = UDim2.new(1, -12, 0, 0)
-	self.tagsHost.Size = UDim2.new(0, 220, 1, 0)
+	self.tagsHost.Size = UDim2.new(0, 196, 1, 0)
 	self.tagsHost.Parent = self.topbar
 
 	local tagsLayout = Instance.new("UIListLayout")
@@ -392,94 +424,110 @@ end
 function Window:_buildBody()
 	self.body = Instance.new("Frame")
 	self.body.Name = "Body"
-	self.body.Size = UDim2.new(1, 0, 1, -46)
-	self.body.Position = UDim2.fromOffset(0, 46)
+	self.body.Size = UDim2.new(1, 0, 1, -self.topbarHeight)
+	self.body.Position = UDim2.fromOffset(0, self.topbarHeight)
 	self.body.BorderSizePixel = 0
 	self.body.BackgroundTransparency = 1
 	self.body.Parent = self.main
 
 	self.sidebar = Instance.new("Frame")
 	self.sidebar.Name = "Sidebar"
-	self.sidebar.Size = UDim2.new(0, 194, 1, 0)
+	self.sidebar.Size = UDim2.new(0, self.sidebarWidth, 1, 0)
 	self.sidebar.BorderSizePixel = 0
 	self.sidebar.Parent = self.body
 	self:_bindTheme(self.sidebar, "BackgroundColor3", "colors.background", Color3.fromRGB(237, 242, 248))
+	corner(self.sidebar, 12)
+
+	self.sidebarPane = Instance.new("Frame")
+	self.sidebarPane.Name = "SidebarPane"
+	self.sidebarPane.Size = UDim2.new(1, -10, 1, -10)
+	self.sidebarPane.Position = UDim2.fromOffset(5, 5)
+	self.sidebarPane.BorderSizePixel = 0
+	self.sidebarPane.Parent = self.sidebar
+	corner(self.sidebarPane, 10)
+	stroke(self.sidebarPane, token(self.theme, "colors.border", Color3.fromRGB(172, 182, 196)), 0.28)
+	self:_bindTheme(self.sidebarPane, "BackgroundColor3", "colors.surface", Color3.fromRGB(248, 250, 255))
+
+	self.searchHost = Instance.new("Frame")
+	self.searchHost.Name = "SearchHost"
+	self.searchHost.Size = UDim2.new(1, -12, 0, 30)
+	self.searchHost.Position = UDim2.fromOffset(6, 6)
+	self.searchHost.BorderSizePixel = 0
+	self.searchHost.Parent = self.sidebarPane
+	corner(self.searchHost, 9)
+	stroke(self.searchHost, token(self.theme, "colors.border", Color3.fromRGB(172, 182, 196)), 0.28)
+	self:_bindTheme(self.searchHost, "BackgroundColor3", "colors.background", Color3.fromRGB(241, 246, 252))
+	setTreeZIndex(self.searchHost, 20)
+
+	local searchIcon = Instance.new("TextLabel")
+	searchIcon.Name = "Icon"
+	searchIcon.BackgroundTransparency = 1
+	searchIcon.Size = UDim2.fromOffset(20, 20)
+	searchIcon.Position = UDim2.fromOffset(8, 5)
+	searchIcon.Font = self.font
+	searchIcon.TextSize = 14
+	searchIcon.Text = self.iconRegistry:resolve("search")
+	searchIcon.Parent = self.searchHost
+	self:_bindTheme(searchIcon, "TextColor3", "colors.textMuted", Color3.fromRGB(94, 106, 126))
+	searchIcon.ZIndex = 21
+
+	self.searchInput = Instance.new("TextBox")
+	self.searchInput.Name = "Input"
+	self.searchInput.BackgroundTransparency = 1
+	self.searchInput.Size = UDim2.new(1, -34, 1, 0)
+	self.searchInput.Position = UDim2.fromOffset(30, 0)
+	self.searchInput.Font = self.font
+	self.searchInput.TextSize = 13
+	self.searchInput.TextXAlignment = Enum.TextXAlignment.Left
+	self.searchInput.ClearTextOnFocus = false
+	self.searchInput.PlaceholderText = "Search..."
+	self.searchInput.Parent = self.searchHost
+	self:_bindTheme(self.searchInput, "TextColor3", "colors.text", Color3.fromRGB(22, 22, 24))
+	self:_bindTheme(self.searchInput, "PlaceholderColor3", "colors.textMuted", Color3.fromRGB(94, 106, 126))
+	self.searchInput.ZIndex = 21
 
 	self.tabsList = Instance.new("ScrollingFrame")
 	self.tabsList.Name = "TabsList"
-	self.tabsList.Size = UDim2.new(1, -10, 1, -12)
-	self.tabsList.Position = UDim2.fromOffset(5, 6)
+	self.tabsList.Size = UDim2.new(1, -12, 1, -48)
+	self.tabsList.Position = UDim2.fromOffset(6, 42)
 	self.tabsList.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	self.tabsList.CanvasSize = UDim2.new()
-	self.tabsList.ScrollBarThickness = 3
+	self.tabsList.ScrollBarThickness = 2
 	self.tabsList.BackgroundTransparency = 1
 	self.tabsList.BorderSizePixel = 0
-	self.tabsList.Parent = self.sidebar
+	self.tabsList.Parent = self.sidebarPane
+	self.tabsList.ZIndex = 10
 
 	local tabsPadding = Instance.new("UIPadding")
 	tabsPadding.PaddingBottom = UDim.new(0, 6)
 	tabsPadding.Parent = self.tabsList
 
 	local tabsLayout = Instance.new("UIListLayout")
-	tabsLayout.Padding = UDim.new(0, 6)
+	tabsLayout.Padding = UDim.new(0, 5)
 	tabsLayout.Parent = self.tabsList
 
 	self.content = Instance.new("Frame")
 	self.content.Name = "Content"
-	self.content.Size = UDim2.new(1, -194, 1, 0)
-	self.content.Position = UDim2.fromOffset(194, 0)
+	self.content.Size = UDim2.new(1, -self.sidebarWidth, 1, 0)
+	self.content.Position = UDim2.fromOffset(self.sidebarWidth, 0)
 	self.content.BackgroundTransparency = 1
 	self.content.BorderSizePixel = 0
 	self.content.Parent = self.body
 
-	self.searchHost = Instance.new("Frame")
-	self.searchHost.Name = "SearchHost"
-	self.searchHost.Size = UDim2.new(1, -16, 0, 34)
-	self.searchHost.Position = UDim2.fromOffset(8, 8)
-	self.searchHost.BorderSizePixel = 0
-	self.searchHost.Parent = self.content
-	corner(self.searchHost, 9)
-	stroke(self.searchHost, token(self.theme, "colors.border", Color3.fromRGB(172, 182, 196)), 0.2)
-	self:_bindTheme(self.searchHost, "BackgroundColor3", "colors.topbar", Color3.fromRGB(232, 238, 245))
-
-	local searchIcon = Instance.new("TextLabel")
-	searchIcon.Name = "Icon"
-	searchIcon.BackgroundTransparency = 1
-	searchIcon.Size = UDim2.fromOffset(24, 22)
-	searchIcon.Position = UDim2.fromOffset(8, 6)
-	searchIcon.Font = self.font
-	searchIcon.TextSize = 16
-	searchIcon.Text = self.iconRegistry:resolve("search")
-	searchIcon.Parent = self.searchHost
-	self:_bindTheme(searchIcon, "TextColor3", "colors.textMuted", Color3.fromRGB(94, 106, 126))
-
-	self.searchInput = Instance.new("TextBox")
-	self.searchInput.Name = "Input"
-	self.searchInput.BackgroundTransparency = 1
-	self.searchInput.Size = UDim2.new(1, -40, 1, 0)
-	self.searchInput.Position = UDim2.fromOffset(34, 0)
-	self.searchInput.Font = self.font
-	self.searchInput.TextSize = 14
-	self.searchInput.TextXAlignment = Enum.TextXAlignment.Left
-	self.searchInput.ClearTextOnFocus = false
-	self.searchInput.PlaceholderText = "Search in UI..."
-	self.searchInput.Parent = self.searchHost
-	self:_bindTheme(self.searchInput, "TextColor3", "colors.text", Color3.fromRGB(22, 22, 24))
-	self:_bindTheme(self.searchInput, "PlaceholderColor3", "colors.textMuted", Color3.fromRGB(94, 106, 126))
-
 	self.searchResults = Instance.new("ScrollingFrame")
 	self.searchResults.Name = "SearchResults"
-	self.searchResults.Size = UDim2.new(1, -16, 0, 170)
-	self.searchResults.Position = UDim2.fromOffset(8, 46)
+	self.searchResults.Size = UDim2.new(0, self.sidebarWidth - 16, 0, 180)
+	self.searchResults.Position = UDim2.fromOffset(8, self.topbarHeight + 36)
 	self.searchResults.Visible = false
-	self.searchResults.ScrollBarThickness = 3
+	self.searchResults.ScrollBarThickness = 2
 	self.searchResults.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	self.searchResults.CanvasSize = UDim2.new()
 	self.searchResults.BorderSizePixel = 0
-	self.searchResults.Parent = self.content
+	self.searchResults.Parent = self.screenGui
 	corner(self.searchResults, 10)
-	stroke(self.searchResults, token(self.theme, "colors.border", Color3.fromRGB(172, 182, 196)), 0.2)
+	stroke(self.searchResults, token(self.theme, "colors.border", Color3.fromRGB(172, 182, 196)), 0.18)
 	self:_bindTheme(self.searchResults, "BackgroundColor3", "colors.surface", Color3.fromRGB(248, 250, 255))
+	self.searchResults.ZIndex = 60
 
 	local resultPadding = Instance.new("UIPadding")
 	resultPadding.PaddingTop = UDim.new(0, 4)
@@ -494,8 +542,8 @@ function Window:_buildBody()
 
 	self.pagesHost = Instance.new("Frame")
 	self.pagesHost.Name = "PagesHost"
-	self.pagesHost.Size = UDim2.new(1, -16, 1, -54)
-	self.pagesHost.Position = UDim2.fromOffset(8, 46)
+	self.pagesHost.Size = UDim2.new(1, -10, 1, -10)
+	self.pagesHost.Position = UDim2.fromOffset(5, 5)
 	self.pagesHost.BackgroundTransparency = 1
 	self.pagesHost.BorderSizePixel = 0
 	self.pagesHost.Parent = self.content
@@ -503,6 +551,17 @@ function Window:_buildBody()
 	self:_connect(self.searchInput:GetPropertyChangedSignal("Text"), function()
 		self:_refreshSearch()
 	end)
+
+	self:_updateSearchOverlayPosition()
+end
+
+function Window:_updateSearchOverlayPosition()
+	if not self.searchResults or not self.searchHost then
+		return
+	end
+	local absolute = self.searchHost.AbsolutePosition
+	self.searchResults.Position = UDim2.fromOffset(absolute.X, absolute.Y + self.searchHost.AbsoluteSize.Y + 4)
+	self.searchResults.Size = UDim2.fromOffset(self.searchHost.AbsoluteSize.X, 180)
 end
 
 function Window:_buildErrorLabel()
@@ -519,6 +578,7 @@ function Window:_buildErrorLabel()
 	self.errorLabel.BorderSizePixel = 0
 	self.errorLabel.Parent = self.content
 	corner(self.errorLabel, 9)
+	self.errorLabel.ZIndex = 30
 	self:_bindTheme(self.errorLabel, "TextColor3", "colors.danger", Color3.fromRGB(231, 95, 95))
 	self:_bindTheme(self.errorLabel, "BackgroundColor3", "colors.background", Color3.fromRGB(246, 238, 238))
 end
@@ -540,7 +600,7 @@ function Window:_bindResizeAndDrag()
 		local startPos = self.main.Position
 
 		self:_connect(self.topbar.InputBegan, function(input)
-			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 				dragging = true
 				dragStart = input.Position
 				startPos = self.main.Position
@@ -548,7 +608,7 @@ function Window:_bindResizeAndDrag()
 		end)
 
 		self:_connect(UserInputService.InputEnded, function(input)
-			if input.UserInputType == Enum.UserInputType.MouseButton1 then
+			if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 				dragging = false
 			end
 		end)
@@ -557,7 +617,7 @@ function Window:_bindResizeAndDrag()
 			if not dragging or self.maximized then
 				return
 			end
-			if input.UserInputType ~= Enum.UserInputType.MouseMovement then
+			if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then
 				return
 			end
 
@@ -568,8 +628,43 @@ function Window:_bindResizeAndDrag()
 				startPos.Y.Scale,
 				startPos.Y.Offset + delta.Y
 			)
+			self:_updateSearchOverlayPosition()
 		end)
 	end
+
+	local openDragging = false
+	local openDragStart = Vector2.zero
+	local openStartPos = self.openButton.Position
+
+	self:_connect(self.openButton.InputBegan, function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			openDragging = true
+			openDragStart = input.Position
+			openStartPos = self.openButton.Position
+		end
+	end)
+
+	self:_connect(UserInputService.InputEnded, function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			openDragging = false
+		end
+	end)
+
+	self:_connect(UserInputService.InputChanged, function(input)
+		if not openDragging then
+			return
+		end
+		if input.UserInputType ~= Enum.UserInputType.MouseMovement and input.UserInputType ~= Enum.UserInputType.Touch then
+			return
+		end
+		local delta = input.Position - openDragStart
+		self.openButton.Position = UDim2.new(
+			openStartPos.X.Scale,
+			openStartPos.X.Offset + delta.X,
+			openStartPos.Y.Scale,
+			openStartPos.Y.Offset + delta.Y
+		)
+	end)
 
 	if resizeEnabled then
 		self.resizeHandle = Instance.new("Frame")
@@ -613,6 +708,7 @@ function Window:_bindResizeAndDrag()
 			local height = math.max(self.minimumSize.Y, startSize.Y + delta.Y)
 			self.baseSize = Vector2.new(width, height)
 			self.main.Size = UDim2.fromOffset(width, height)
+			self:_updateSearchOverlayPosition()
 		end)
 	end
 end
@@ -642,6 +738,10 @@ function Window:_applyResponsive()
 		self.main.AnchorPoint = Vector2.zero
 		self.main.Position = UDim2.new(0, 8, 0, 8)
 		self.main.Size = UDim2.new(1, -16, 1, -16)
+		self.sidebar.Size = UDim2.new(0, self.sidebarWidth, 1, 0)
+		self.content.Position = UDim2.fromOffset(self.sidebarWidth, 0)
+		self.content.Size = UDim2.new(1, -self.sidebarWidth, 1, 0)
+		self:_updateSearchOverlayPosition()
 		return
 	end
 
@@ -649,23 +749,30 @@ function Window:_applyResponsive()
 		self.main.AnchorPoint = Vector2.zero
 		self.main.Position = UDim2.new(0, 8, 0, 8)
 		self.main.Size = UDim2.new(1, -16, 1, -16)
-		self.sidebar.Size = UDim2.new(0, 148, 1, 0)
-		self.content.Position = UDim2.fromOffset(148, 0)
-		self.content.Size = UDim2.new(1, -148, 1, 0)
+		self.sidebar.Size = UDim2.new(0, self.mobileSidebarWidth, 1, 0)
+		self.content.Position = UDim2.fromOffset(self.mobileSidebarWidth, 0)
+		self.content.Size = UDim2.new(1, -self.mobileSidebarWidth, 1, 0)
 	else
 		self.main.AnchorPoint = Vector2.new(0.5, 0.5)
 		self.main.Position = UDim2.fromScale(0.5, 0.5)
 		self.main.Size = UDim2.fromOffset(self.baseSize.X, self.baseSize.Y)
-		self.sidebar.Size = UDim2.new(0, 194, 1, 0)
-		self.content.Position = UDim2.fromOffset(194, 0)
-		self.content.Size = UDim2.new(1, -194, 1, 0)
+		self.sidebar.Size = UDim2.new(0, self.sidebarWidth, 1, 0)
+		self.content.Position = UDim2.fromOffset(self.sidebarWidth, 0)
+		self.content.Size = UDim2.new(1, -self.sidebarWidth, 1, 0)
 	end
+
+	self:_updateSearchOverlayPosition()
 end
 
 function Window:setMinimized(minimized)
 	self.minimized = minimized == true
 	self.main.Visible = not self.minimized
 	self.openButton.Visible = self.minimized
+	if self.minimized then
+		self.searchResults.Visible = false
+	else
+		self:_updateSearchOverlayPosition()
+	end
 end
 
 function Window:toggleMaximized()
@@ -678,14 +785,16 @@ function Window:setSearchEnabled(enabled)
 	self.searchHost.Visible = self.searchEnabled
 
 	if self.searchEnabled then
-		self.pagesHost.Size = UDim2.new(1, -16, 1, -54)
-		self.pagesHost.Position = UDim2.fromOffset(8, 46)
+		self.tabsList.Size = UDim2.new(1, -12, 1, -48)
+		self.tabsList.Position = UDim2.fromOffset(6, 42)
 	else
-		self.pagesHost.Size = UDim2.new(1, -16, 1, -8)
-		self.pagesHost.Position = UDim2.fromOffset(8, 8)
+		self.tabsList.Size = UDim2.new(1, -12, 1, -12)
+		self.tabsList.Position = UDim2.fromOffset(6, 6)
 		self.searchResults.Visible = false
 		self.searchInput.Text = ""
 	end
+
+	self:_updateSearchOverlayPosition()
 end
 
 function Window:reportError(scope, message)
@@ -732,6 +841,7 @@ function Window:_renderSearchResults(results)
 		)
 		button.Parent = self.searchResults
 		corner(button, 7)
+		button.ZIndex = 61
 		self:_bindTheme(button, "BackgroundColor3", "colors.background", Color3.fromRGB(241, 246, 252))
 		self:_bindTheme(button, "TextColor3", "colors.text", Color3.fromRGB(22, 22, 24))
 
@@ -758,6 +868,7 @@ function Window:_refreshSearch()
 	end
 
 	local results = FuzzySearch.search(query, self.searchEntries, 15)
+	self:_updateSearchOverlayPosition()
 	self:_renderSearchResults(results)
 	self.searchResults.Visible = #results > 0
 end
@@ -847,11 +958,11 @@ function Window:addTab(tabOptions)
 
 	local button = Instance.new("TextButton")
 	button.Name = "TabButton_" .. id
-	button.Size = UDim2.new(1, 0, 0, 32)
+	button.Size = UDim2.new(1, 0, 0, 29)
 	button.BorderSizePixel = 0
 	button.TextXAlignment = Enum.TextXAlignment.Left
 	button.Font = self.font
-	button.TextSize = 14
+	button.TextSize = 13
 	button.Text = ("  %s  %s"):format(self.iconRegistry:resolve(iconName), title)
 	button.Parent = self.tabsList
 	corner(button, 8)
@@ -991,13 +1102,13 @@ function Tab:addSection(sectionOptions)
 	frame.AutomaticSize = Enum.AutomaticSize.Y
 	frame.BorderSizePixel = 0
 	frame.Parent = self.page
-	corner(frame, 10)
+	corner(frame, token(self.window.theme, "rounding.card", 12))
 	stroke(frame, token(self.window.theme, "colors.border", Color3.fromRGB(176, 185, 198)), 0.2)
 	self.window:_bindTheme(frame, "BackgroundColor3", "colors.surface", Color3.fromRGB(248, 250, 255))
 
 	local padding = Instance.new("UIPadding")
 	padding.PaddingTop = UDim.new(0, 10)
-	padding.PaddingBottom = UDim.new(0, 10)
+	padding.PaddingBottom = UDim.new(0, 9)
 	padding.PaddingLeft = UDim.new(0, 10)
 	padding.PaddingRight = UDim.new(0, 10)
 	padding.Parent = frame
@@ -1628,12 +1739,14 @@ function Section:addDropdown(dropdownOptions)
 	local function closeDropdown()
 		opened = false
 		pop.Visible = false
+		pop.Size = UDim2.new(0.62, 0, 0, 0)
 		frame.Size = UDim2.new(1, 0, 0, 34)
 	end
 
 	local function openDropdown()
 		opened = true
 		pop.Visible = true
+		pop.Size = UDim2.new(0.62, 0, 0, math.max(1, #options) * 28 + 2)
 		frame.Size = UDim2.new(1, 0, 0, 34 + math.max(1, #options) * 28 + 6)
 	end
 
