@@ -1,25 +1,8 @@
--- Tail UI Path Loader (Release 2.1)
--- No getgenv dependency. Configure with _G.TAILUI_REMOTE when needed.
---
--- Minimal usage:
--- local TailUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Brennoleon/TailUI/main/dist/TailUI.pathloader.lua"))()
---
--- Optional config:
--- _G.TAILUI_REMOTE = {
---     user = "Brennoleon",
---     repo = "TailUI",
---     branch = "main",
---     basePath = "src",
---     forceReload = false,
---     debug = false,
---     showBootLoader = true,
---     authToken = "ghp_xxx", -- for private repo fallback requests
--- }
-
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local RunService = game:GetService("RunService")
 
+-- here is main file <3
 local function readGlobal(name)
 	local env = getfenv and getfenv() or _G
 	if env and env[name] ~= nil then
